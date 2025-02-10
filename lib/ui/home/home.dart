@@ -7,6 +7,8 @@ import 'package:music_app_demo/ui/home/viewmodel.dart';
 import 'package:music_app_demo/ui/user/account.dart';
 import 'package:music_app_demo/ui/settings/settings.dart';
 
+import '../now_playing/playing.dart';
+
 class MusicApp extends StatelessWidget {
   const MusicApp({super.key});
 
@@ -18,7 +20,7 @@ class MusicApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: MusicHomePage(),
+      home: const MusicHomePage(),
     );
   }
 }
@@ -149,6 +151,38 @@ class _HomeTabPageState extends State<HomeTabPage> {
       });
     });
   }
+
+  void showBottomSheet() {
+    showModalBottomSheet(
+        context: context,
+        builder: (context) {
+          return ClipRRect(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            child: Container(
+              height: 400,
+              color: Colors.grey,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Text("Modal Bottom Sheet"),
+                    ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close Bottom Sheet"))
+                  ],
+                ),
+              ),
+            ),
+          );
+        });
+  }
+
+  void navigate(Song song) {
+    Navigator.push(context, CupertinoPageRoute(builder: (context) {
+      return NowPlaying(songs: songs, playingSong: song);
+    }));
+  }
 }
 
 class _SongItemSection extends StatelessWidget {
@@ -163,26 +197,29 @@ class _SongItemSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.only(
-        left: 24,
-        right: 8
+      contentPadding: const EdgeInsets.only(left: 24, right: 8),
+      leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: FadeInImage.assetNetwork(
+            placeholder: 'assets/itune.jpeg',
+            image: song.image,
+            width: 48,
+            height: 48,
+            imageErrorBuilder: (context, error, stackTrace) {
+              return Image.asset('assets/itune.jpeg', width: 48, height: 48);
+            },
+          )),
+      title: Text(song.title),
+      subtitle: Text(song.artist),
+      trailing: IconButton(
+        icon: const Icon(Icons.more_horiz),
+        onPressed: () {
+          parent.showBottomSheet();
+        },
       ),
-        leading: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: FadeInImage.assetNetwork(
-              placeholder: 'assets/itune.jpeg',
-              image: song.image,
-              width: 48,
-              height: 48,
-              imageErrorBuilder: (context, error, stackTrace) {
-                return Image.asset('assets/itune.jpeg', width: 48, height: 48);
-              },
-            )),
-        title: Text(song.title),
-        subtitle: Text(song.artist),
-        trailing: IconButton(
-          icon: const Icon(Icons.more_horiz),
-          onPressed: () {},
-        ));
+      onTap: () {
+        parent.navigate(song);
+      },
+    );
   }
 }
