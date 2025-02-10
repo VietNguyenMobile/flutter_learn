@@ -21,6 +21,7 @@ class MusicApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const MusicHomePage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
