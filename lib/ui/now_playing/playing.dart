@@ -1,6 +1,7 @@
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../data/model/song.dart';
 import 'audio_player_manager.dart';
@@ -31,15 +32,27 @@ class _NowPlayingPageState extends State<NowPlayingPage>
     with SingleTickerProviderStateMixin {
   late AnimationController _imageAnimController;
   late AudioPlayerManager _audioPlayerManager;
+  late int _selectedItemIndex;
+  late Song _song;
+  late double _currentAnimationPosition = 0.0;
 
   @override
   void initState() {
     super.initState();
+    // _currentAnimationPosition = 0.0;
+    _song = widget.playingSong;
     _imageAnimController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 12000));
-    _audioPlayerManager =
-        AudioPlayerManager(songUrl: widget.playingSong.source);
+    _audioPlayerManager = AudioPlayerManager(songUrl: _song.source);
     _audioPlayerManager.init();
+    _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
+  }
+
+  @override
+  void dispose() {
+    _audioPlayerManager.dispose();
+    _imageAnimController.dispose();
+    super.dispose();
   }
 
   @override
@@ -63,7 +76,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
             child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(widget.playingSong.album),
+            Text(_song.album),
             const SizedBox(
               height: 16,
             ),
@@ -77,7 +90,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                 borderRadius: BorderRadius.circular(radius),
                 child: FadeInImage.assetNetwork(
                   placeholder: "assets/itune.jpeg",
-                  image: widget.playingSong.image,
+                  image: _song.image,
                   width: screenWidth - delta,
                   height: screenWidth - delta,
                   imageErrorBuilder: (context, error, stackTrace) {
@@ -101,7 +114,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                     Column(
                       children: [
                         Text(
-                          widget.playingSong.title,
+                          _song.title,
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium!
@@ -115,7 +128,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                           height: 8,
                         ),
                         Text(
-                          widget.playingSong.artist,
+                          _song.artist,
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium!
@@ -137,14 +150,16 @@ class _NowPlayingPageState extends State<NowPlayingPage>
                 padding: const EdgeInsets.only(
                     top: 32, left: 24, right: 24, bottom: 16),
                 child: _progressBar()),
-            Padding(padding: const EdgeInsets.only(
-                top: 0, left: 24, right: 24, bottom: 0),child: _mediaButtons(),)
+            Padding(
+              padding:
+                  const EdgeInsets.only(top: 0, left: 24, right: 24, bottom: 0),
+              child: _mediaButtons(),
+            )
           ],
         )),
       ),
     );
   }
-
 
   StreamBuilder<DurationState> _progressBar() {
     return StreamBuilder<DurationState>(
@@ -154,7 +169,20 @@ class _NowPlayingPageState extends State<NowPlayingPage>
           final progress = durationState?.progress ?? Duration.zero;
           final buffered = durationState?.buffered ?? Duration.zero;
           final total = durationState?.total ?? Duration.zero;
-          return ProgressBar(progress: progress, total: total);
+          return ProgressBar(
+            progress: progress,
+            total: total,
+            buffered: buffered,
+            onSeek: _audioPlayerManager.player.seek,
+            barHeight: 5.0,
+            barCapShape: BarCapShape.round,
+            baseBarColor: Colors.grey.withOpacity(0.3),
+            progressBarColor: Colors.green,
+            bufferedBarColor: Colors.grey.withOpacity(0.3),
+            thumbColor: Colors.deepPurple,
+            thumbGlowColor: Colors.green.withOpacity(0.3),
+            thumbRadius: 10.0,
+          );
         });
   }
 
@@ -163,14 +191,137 @@ class _NowPlayingPageState extends State<NowPlayingPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          MediaButtonControl(function: null, icon: Icons.shuffle, color: Colors.deepPurple, size: 24),
-          MediaButtonControl(function: null, icon: Icons.skip_previous, color: Colors.deepPurple, size: 36),
-          MediaButtonControl(function: null, icon: Icons.play_arrow_sharp, color: Colors.deepPurple, size: 48),
-          MediaButtonControl(function: null, icon: Icons.skip_next, color: Colors.deepPurple, size: 36),
-          MediaButtonControl(function: null, icon: Icons.repeat, color: Colors.deepPurple, size: 24),
+          MediaButtonControl(
+              function: null,
+              icon: Icons.shuffle,
+              color: Colors.deepPurple,
+              size: 24),
+          MediaButtonControl(
+              function: _setPrevSong,
+              icon: Icons.skip_previous,
+              color: Colors.deepPurple,
+              size: 36),
+          _playButton(),
+          MediaButtonControl(
+              function: _setNextSong,
+              icon: Icons.skip_next,
+              color: Colors.deepPurple,
+              size: 36),
+          MediaButtonControl(
+              function: null,
+              icon: Icons.repeat,
+              color: Colors.deepPurple,
+              size: 24),
         ],
       ),
     );
+  }
+
+  StreamBuilder<PlayerState> _playButton() {
+    return StreamBuilder(
+      stream: _audioPlayerManager.player.playerStateStream,
+      builder: (context, snapshot) {
+        final playState = snapshot.data;
+        final processingState = playState?.processingState;
+        final playing = playState?.playing;
+        if (processingState == ProcessingState.loading ||
+            processingState == ProcessingState.buffering) {
+          // todo: pause animation
+          _pauseRotationAnim();
+          return Container(
+              margin: const EdgeInsets.all(8),
+              width: 48,
+              height: 48,
+              child: const CircularProgressIndicator());
+        } else if (playing != true) {
+          return MediaButtonControl(
+              // todo: start or resume animation
+              function: () {
+                _audioPlayerManager.player.play();
+                // _imageAnimController.forward(from: _currentAnimationPosition);
+                // _imageAnimController.repeat();
+              },
+              icon: Icons.play_arrow,
+              color: null,
+              size: 48);
+        } else if (processingState != ProcessingState.completed) {
+          // todo play animation
+          _playRotationAnim();
+          return MediaButtonControl(
+            function: () {
+              _audioPlayerManager.player.pause();
+              // _imageAnimController.stop();
+              // _currentAnimationPosition = _imageAnimController.value;
+              _pauseRotationAnim();
+            },
+            icon: Icons.pause,
+            color: null,
+            size: 48,
+          );
+        } else {
+          // todo: if song completed -> stop and reset animation
+          if (processingState == ProcessingState.completed) {
+            // _imageAnimController.stop();
+            // _currentAnimationPosition = 0.0;
+            _stopRotationAnim();
+            _resetRotationAnim();
+          }
+          return MediaButtonControl(
+            function: () {
+              // todo: start animation
+              // _imageAnimController.forward(from: _currentAnimationPosition);
+              // _imageAnimController.repeat();
+              _audioPlayerManager.player.seek(Duration.zero);
+              _resetRotationAnim();
+              _playRotationAnim();
+            },
+            icon: Icons.replay,
+            color: null,
+            size: 48,
+          );
+        }
+      },
+    );
+  }
+
+  void _setNextSong() {
+    ++_selectedItemIndex;
+    final nextSong = widget.songs[_selectedItemIndex];
+    _audioPlayerManager.updateSongUrl(nextSong.source);
+    // todo: reset animation
+    _resetRotationAnim();
+    setState(() {
+      _song = nextSong;
+    });
+  }
+
+  void _setPrevSong() {
+    --_selectedItemIndex;
+    final nextSong = widget.songs[_selectedItemIndex];
+    _audioPlayerManager.updateSongUrl(nextSong.source);
+    _resetRotationAnim();
+    setState(() {
+      _song = nextSong;
+    });
+  }
+
+  void _playRotationAnim() {
+    _imageAnimController.forward(from: _currentAnimationPosition);
+    _imageAnimController.repeat();
+  }
+
+  void _pauseRotationAnim() {
+    _stopRotationAnim();
+    _currentAnimationPosition = _imageAnimController.value;
+  }
+
+  void _stopRotationAnim() {
+    _imageAnimController.stop();
+  }
+
+  void _resetRotationAnim() {
+    _currentAnimationPosition = 0.0;
+    _imageAnimController.value = _currentAnimationPosition;
   }
 }
 
