@@ -4,6 +4,7 @@ import 'package:music_app_demo/data/model/song.dart';
 
 import 'package:music_app_demo/ui/discovery/discovery.dart';
 import 'package:music_app_demo/ui/home/viewmodel.dart';
+import 'package:music_app_demo/ui/now_playing/audio_player_manager.dart';
 import 'package:music_app_demo/ui/user/account.dart';
 import 'package:music_app_demo/ui/settings/settings.dart';
 
@@ -105,6 +106,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
   @override
   void dispose() {
     _viewModel.songStream.close();
+    AudioPlayerManager().dispose();
     super.dispose();
   }
 

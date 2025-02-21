@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +37,7 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   late int _selectedItemIndex;
   late Song _song;
   late double _currentAnimationPosition = 0.0;
+  bool _isShuffle = false;
 
   @override
   void initState() {
@@ -43,14 +46,22 @@ class _NowPlayingPageState extends State<NowPlayingPage>
     _song = widget.playingSong;
     _imageAnimController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 12000));
-    _audioPlayerManager = AudioPlayerManager(songUrl: _song.source);
-    _audioPlayerManager.init();
+    // _audioPlayerManager = AudioPlayerManager(songUrl: _song.source);
+    // _audioPlayerManager.updateSongUrl(_song.source);
+    // _audioPlayerManager.prepare();
+    if (_audioPlayerManager.songUrl.compareTo(_song.source) !=0) {
+      _audioPlayerManager.updateSongUrl(_song.source);
+      _audioPlayerManager.prepare(isNewSong: true);
+    } else {
+      _audioPlayerManager.prepare(isNewSong: false);
+    }
+
     _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
   }
 
   @override
   void dispose() {
-    _audioPlayerManager.dispose();
+    // _audioPlayerManager.dispose();
     _imageAnimController.dispose();
     super.dispose();
   }
@@ -192,9 +203,9 @@ class _NowPlayingPageState extends State<NowPlayingPage>
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           MediaButtonControl(
-              function: null,
+              function: _setShuffle,
               icon: Icons.shuffle,
-              color: Colors.deepPurple,
+              color: _getShuffleColor(),
               size: 24),
           MediaButtonControl(
               function: _setPrevSong,
@@ -285,7 +296,18 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   }
 
   void _setNextSong() {
-    ++_selectedItemIndex;
+    // ++_selectedItemIndex;
+    if (_isShuffle) {
+      var random = Random();
+      _selectedItemIndex = random.nextInt(widget.songs.length);
+    } else {
+      ++_selectedItemIndex;
+    }
+
+    if(_selectedItemIndex >= widget.songs.length) {
+      _selectedItemIndex = _selectedItemIndex % widget.songs.length;
+    }
+
     final nextSong = widget.songs[_selectedItemIndex];
     _audioPlayerManager.updateSongUrl(nextSong.source);
     // todo: reset animation
@@ -296,7 +318,17 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   }
 
   void _setPrevSong() {
-    --_selectedItemIndex;
+    // --_selectedItemIndex;
+    if (_isShuffle) {
+      var random = Random();
+      _selectedItemIndex = random.nextInt(widget.songs.length);
+    } else {
+      --_selectedItemIndex;
+    }
+
+    if(_selectedItemIndex < 0) {
+      _selectedItemIndex = (-1*_selectedItemIndex) % widget.songs.length;
+    }
     final nextSong = widget.songs[_selectedItemIndex];
     _audioPlayerManager.updateSongUrl(nextSong.source);
     _resetRotationAnim();
@@ -322,6 +354,16 @@ class _NowPlayingPageState extends State<NowPlayingPage>
   void _resetRotationAnim() {
     _currentAnimationPosition = 0.0;
     _imageAnimController.value = _currentAnimationPosition;
+  }
+
+  void _setShuffle() {
+    setState(() {
+      _isShuffle = !_isShuffle;
+    });
+  }
+
+  Color? _getShuffleColor() {
+    return _isShuffle ? Colors.deepPurple : Colors.grey;
   }
 }
 
